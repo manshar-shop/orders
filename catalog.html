@@ -1,0 +1,289 @@
+﻿<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>منشر - إدارة المنتجات</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Tajawal', sans-serif; background-color: #f8fafc; color: #1e293b; }
+        .sidebar { background: #3a2016; }
+        .active-tab { background: rgba(255,255,255,0.1); border-right: 4px solid #fbbf24; }
+        .loader-spin { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+<div id="app" class="min-h-screen flex" v-show="isAuthorized">
+
+    <aside class="sidebar w-64 text-white flex flex-col fixed h-full z-50 shadow-2xl">
+        <div class="p-8 text-center border-b border-white/5">
+            <div class="w-24 h-24 bg-white rounded-3xl mx-auto mb-4 flex items-center justify-center p-2 shadow-xl overflow-hidden">
+                <img src="logo1.png" alt="Logo" class="w-full h-full object-contain" onerror="this.src='https://i.ibb.co/68vD84D/logo1.png'">
+            </div>
+            <h1 class="text-xl font-black">منشر</h1>
+            <p class="text-blue-300 text-[10px] mt-1 tracking-widest font-bold uppercase">نظام إدارة المبيعات</p>
+            <div class="mt-3 flex items-center justify-center gap-2">
+                <span class="text-[10px] font-black px-3 py-1 rounded-full bg-yellow-400 text-yellow-900">
+                    👑 مدير
+                </span>
+            </div>
+        </div>
+        <nav class="flex-1 py-10 px-4 space-y-2">
+            <a href="index.html" class="w-full flex items-center gap-4 px-6 py-4 rounded-xl transition-all font-bold hover:bg-white/5">
+                <i data-lucide="plus-circle" class="w-5 h-5 text-yellow-400"></i> تسجيل طلب
+            </a>
+            <a href="my_orders.html" class="w-full flex items-center gap-4 px-6 py-4 rounded-xl transition-all font-bold hover:bg-white/5">
+                <i data-lucide="list" class="w-5 h-5 text-yellow-400"></i> طلباتي
+            </a>
+            <a href="invoices.html" class="w-full flex items-center gap-4 px-6 py-4 rounded-xl transition-all font-bold hover:bg-white/5">
+                <i data-lucide="printer" class="w-5 h-5 text-yellow-400"></i> مركز الفواتير
+            </a>
+            <a href="archive.html" class="w-full flex items-center gap-4 px-6 py-4 rounded-xl transition-all font-bold hover:bg-white/5">
+                <i data-lucide="database" class="w-5 h-5 text-yellow-400"></i> أرشيف الطلبات العام
+            </a>
+            <a href="catalog.html" class="active-tab w-full flex items-center gap-4 px-6 py-4 rounded-xl transition-all font-bold hover:bg-white/5">
+                <i data-lucide="package" class="w-5 h-5 text-yellow-400"></i> المنتجات
+            </a>
+            <a href="reports.html" class="w-full flex items-center gap-4 px-6 py-4 rounded-xl transition-all font-bold hover:bg-white/5">
+                <i data-lucide="pie-chart" class="w-5 h-5 text-yellow-400"></i> التقارير والإحصائيات
+            </a>
+        </nav>
+        <div class="p-4 border-t border-white/10">
+            <button @click="doLogout" class="w-full flex items-center gap-3 px-6 py-3 rounded-xl hover:bg-white/10 transition-all font-bold text-red-300 hover:text-red-200">
+                <i data-lucide="log-out" class="w-4 h-4"></i> تسجيل خروج
+            </button>
+        </div>
+    </aside>
+
+    <main class="flex-1 mr-64 p-8 relative min-h-screen">
+        <div v-if="notification" class="fixed top-10 left-10 z-[100] p-5 rounded-2xl shadow-2xl bg-white border-l-8 flex items-center gap-4 transition-all"
+             :class="{'border-red-500 text-red-600': notification.type === 'error', 'border-green-500 text-green-600': notification.type === 'success', 'border-blue-500 text-blue-700': notification.type === 'info'}">
+            <i v-if="notification.type === 'success'" data-lucide="check-circle"></i>
+            <i v-else-if="notification.type === 'error'" data-lucide="alert-circle"></i>
+            <i v-else data-lucide="loader" class="animate-spin"></i>
+            <span class="font-black">{{ notification.msg }}</span>
+        </div>
+
+        <div v-if="syncLoading" class="fixed inset-0 bg-white/70 z-40 flex flex-col items-center justify-center backdrop-blur-sm">
+            <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-[#3a2016] mb-4"></div>
+            <p class="font-black text-[#3a2016]">جاري مزامنة المنتجات...</p>
+        </div>
+
+        <header class="mb-10 flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            <div>
+                <h2 class="text-3xl font-black text-[#3a2016]">إدارة المنتجات والكتالوج</h2>
+                <p class="text-gray-400 font-bold mt-1 text-sm">إضافة وتعديل وحذف أشكال المناشر وأسعارها</p>
+            </div>
+            <div class="flex gap-2">
+                <button @click="syncFromSheet" class="bg-[#3a2016] text-white px-6 py-3 rounded-2xl font-black flex items-center gap-2 shadow-lg hover:bg-blue-800 transition-all">
+                    <i data-lucide="refresh-cw" :class="{'loader-spin': syncLoading}" class="w-4 h-4"></i>
+                    مزامنة السحاب
+                </button>
+            </div>
+        </header>
+
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in">
+            <div class="lg:col-span-1">
+                <div class="bg-white p-8 rounded-3xl shadow-sm border sticky top-8">
+                    <h3 class="font-black text-[#3a2016] text-xl mb-6 flex items-center gap-2">
+                        <i data-lucide="package-plus" class="text-blue-600"></i> إضافة منتج جديد
+                    </h3>
+                    <form @submit.prevent="saveCatalogItem" class="space-y-5">
+                        <div>
+                            <label class="block text-xs font-black text-gray-400 mb-2 uppercase">معرف المنتج (ID)</label>
+                            <input v-model="catalogForm.id" required placeholder="مثال: design-52" class="w-full p-4 bg-gray-50 border-2 border-transparent rounded-2xl focus:border-blue-500 outline-none font-bold text-gray-900" dir="ltr">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-gray-400 mb-2 uppercase">اسم المنتج</label>
+                            <input v-model="catalogForm.name" required placeholder="مثال: ديزاين 52" class="w-full p-4 bg-gray-50 border-2 border-transparent rounded-2xl focus:border-blue-500 outline-none font-bold text-gray-900">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-gray-400 mb-2 uppercase">السعر الأساسي (SAR)</label>
+                            <input v-model.number="catalogForm.price" type="number" required min="1" placeholder="مثال: 199" class="w-full p-4 bg-gray-50 border-2 border-transparent rounded-2xl focus:border-blue-500 outline-none font-bold text-gray-900 text-left" dir="ltr">
+                        </div>
+                        <button type="submit" :disabled="isSaving" class="w-full bg-[#3a2016] text-white py-4 rounded-2xl font-black shadow-xl hover:bg-blue-800 transition-all flex items-center justify-center gap-2 mt-4">
+                            <i v-if="isSaving" data-lucide="loader" class="w-5 h-5 animate-spin"></i>
+                            <i v-else data-lucide="save" class="w-5 h-5"></i>
+                            {{ isSaving ? 'جاري الحفظ...' : 'حفظ المنتج' }}
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-3xl shadow-sm border overflow-hidden">
+                    <div class="p-6 bg-gray-50 border-b flex justify-between items-center">
+                        <h3 class="font-black text-[#3a2016] text-lg flex items-center gap-2">
+                            <i data-lucide="list" class="text-blue-600"></i> قائمة المنتجات المسجلة
+                        </h3>
+                        <span class="bg-blue-100 text-blue-700 px-4 py-1.5 rounded-full text-sm font-black">{{ catalog.length }} منتج</span>
+                    </div>
+                    
+                    <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
+                        <table class="w-full text-right border-collapse text-sm">
+                            <thead class="bg-[#3a2016] text-white sticky top-0 z-10">
+                                <tr>
+                                    <th class="p-4">صورة مصغرة</th>
+                                    <th class="p-4">ID (المعرف)</th>
+                                    <th class="p-4">الاسم</th>
+                                    <th class="p-4">السعر (SAR)</th>
+                                    <th class="p-4 text-center">حذف</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="item in catalog" :key="item.id" class="border-b hover:bg-blue-50/50 transition-colors">
+                                    <td class="p-4">
+                                        <div class="w-12 h-12 bg-white border rounded-lg flex items-center justify-center p-1 shadow-sm">
+                                            <img :src="`products/${item.name}.webp`" :data-name="item.name" onerror="if(!this.getAttribute('data-j')){this.setAttribute('data-j','1'); this.src='products/'+this.getAttribute('data-name')+'.jpg';} else if(!this.getAttribute('data-p')){this.setAttribute('data-p','1'); this.src='products/'+this.getAttribute('data-name')+'.png';} else {this.onerror=null; this.src='logo1.png';}" class="w-full h-full object-contain">
+                                        </div>
+                                    </td>
+                                    <td class="p-4 font-mono text-gray-500 font-bold" dir="ltr">{{ item.id }}</td>
+                                    <td class="p-4 font-black text-[#3a2016]">{{ item.name }}</td>
+                                    <td class="p-4 font-black text-green-600">{{ item.price }}</td>
+                                    <td class="p-4 text-center">
+                                        <button @click="deleteCatalogItem(item.id)" class="p-2.5 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all shadow-sm">
+                                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                <tr v-if="catalog.length === 0">
+                                    <td colspan="5" class="p-10 text-center text-gray-400 font-bold">لا توجد منتجات، قم بإضافة أول منتج.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+</div>
+
+<script type="module">
+    const { createApp, ref, onMounted } = Vue;
+
+    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx8cHHMjfwPrygxjWSSSefPM1YAmpYaPOfQzKJ9IYxEVRcmZ3389uYNvrIggkngRwGA/exec";
+
+    createApp({
+        setup() {
+            const currentUser = ref(null);
+            const isAuthorized = ref(false); 
+            
+            const catalog = ref([]);
+            const catalogForm = ref({ id: '', name: '', price: '' });
+            
+            const syncLoading = ref(false);
+            const isSaving = ref(false);
+            const notification = ref(null);
+
+            const showNotify = (msg, type = 'success') => {
+                notification.value = { msg, type };
+                setTimeout(() => notification.value = null, 4000);
+                setTimeout(() => lucide.createIcons(), 50);
+            };
+
+            const doLogout = () => { sessionStorage.removeItem('hb_user'); window.location.href = 'index.html'; };
+
+            const syncFromSheet = async () => {
+                syncLoading.value = true;
+                try {
+                    const res = await fetch(GOOGLE_SCRIPT_URL, { redirect: 'follow' });
+                    const text = await res.text();
+                    const result = JSON.parse(text);
+                    
+                    let newCat = [];
+                    if (result.catalog && result.catalog.length > 0) {
+                        result.catalog.forEach(r => {
+                            let id = String(r['id'] || r['اسم المنتج'] || '');
+                            let name = String(r['name'] || r['اسم المنتج'] || '');
+                            let price = Number(r['price'] || r['السعر'] || 0);
+                            if (id) newCat.push({ id, name, price });
+                        });
+                    }
+                    catalog.value = newCat;
+                    showNotify('تم تحديث قائمة المنتجات');
+                } catch(e) {
+                    showNotify('خطأ في المزامنة. يرجى التأكد من الاتصال.', 'error');
+                } finally { 
+                    syncLoading.value = false; 
+                }
+            };
+
+            const saveCatalogItem = async () => {
+                if (!catalogForm.value.id || !catalogForm.value.name || !catalogForm.value.price) {
+                    showNotify('يرجى تعبئة جميع الحقول', 'error'); return;
+                }
+                
+                isSaving.value = true;
+                const payload = {
+                    action: 'create',
+                    target: 'catalog',
+                    id: String(catalogForm.value.id),
+                    name: String(catalogForm.value.name),
+                    price: Number(catalogForm.value.price)
+                };
+
+                try {
+                    await fetch(GOOGLE_SCRIPT_URL, {
+                        method: 'POST', mode: 'no-cors',
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    catalog.value.unshift({...payload});
+                    catalogForm.value = { id: '', name: '', price: '' };
+                    showNotify('تم الحفظ بنجاح');
+                } catch (e) {
+                    showNotify('تم الحفظ محلياً', 'error');
+                } finally {
+                    isSaving.value = false;
+                }
+            };
+
+            const deleteCatalogItem = async (id) => {
+                if (!confirm(`هل أنت متأكد من حذف المنتج ${id}؟`)) return;
+                
+                catalog.value = catalog.value.filter(c => c.id !== id);
+                
+                try {
+                    await fetch(GOOGLE_SCRIPT_URL, {
+                        method: 'POST', mode: 'no-cors',
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify({ action: 'delete', target: 'catalog', id: id })
+                    });
+                    showNotify('تم الحذف بنجاح');
+                } catch (e) {
+                    showNotify('تم الحذف محلياً', 'error');
+                }
+            };
+
+            onMounted(() => { 
+                const storedUser = sessionStorage.getItem('hb_user');
+                if (!storedUser) { window.location.href = 'index.html'; return; }
+                const user = JSON.parse(storedUser);
+                
+                if (user.role !== 'admin') { window.location.href = 'index.html'; return; }
+                
+                currentUser.value = user;
+                isAuthorized.value = true; 
+                
+                setTimeout(() => lucide.createIcons(), 500); 
+                syncFromSheet();
+            });
+
+            return {
+                currentUser, isAuthorized, catalog, catalogForm, syncLoading, isSaving, notification,
+                doLogout, syncFromSheet, saveCatalogItem, deleteCatalogItem
+            };
+        }
+    }).mount('#app');
+</script>
+</body>
+</html>
+
