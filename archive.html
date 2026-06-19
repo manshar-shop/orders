@@ -230,9 +230,8 @@
                                         <p class="font-bold text-gray-700 flex justify-between">
                                             <span>• سعر المنشر الأساسي:</span> <span class="font-black">{{ p.basePrice }} SAR</span>
                                         </p>
-                                        <p class="font-bold text-gray-700 flex justify-between" :class="{'text-gray-500': p.color === 'white' || p.color === 'أبيض' || p.color === 'silver' || p.color === 'فضي'}">
-                                            <span>• اللون ({{ p.color === 'white' || p.color === 'أبيض' ? 'أبيض' : (p.color === 'black' || p.color === 'أسود' ? 'أسود' : (p.color === 'gold' || p.color === 'ذهبي' ? 'ذهبي' : (p.color === 'silver' || p.color === 'فضي' ? 'فضي' : p.color))) }}):</span> 
-                                            <span class="font-black">{{ (p.color === 'gold' || p.color === 'black' || p.color === 'أسود' || p.color === 'ذهبي') ? '+19 SAR' : 'مجاناً' }}</span>
+                                        <p class="font-bold text-gray-700" :class="{'text-gray-500': p.color === 'white' || p.color === 'أبيض' || p.color === 'silver' || p.color === 'فضي'}">
+                                            <span>• اللون ({{ p.color === 'white' || p.color === 'أبيض' ? 'أبيض' : (p.color === 'black' || p.color === 'أسود' ? 'أسود' : (p.color === 'gold' || p.color === 'ذهبي' ? 'ذهبي' : (p.color === 'silver' || p.color === 'فضي' ? 'فضي' : p.color))) }})</span> 
                                         </p>
                                         <p v-if="p.hasLighting" class="font-bold text-gray-700 flex justify-between">
                                             <span>• إضافة إضاءة:</span> <span class="font-black">+129 SAR</span>
