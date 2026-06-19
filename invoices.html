@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
@@ -193,7 +193,7 @@
                     <p class="font-black text-sm text-[#3a2016]">مؤسسة حكاية ماسة للتجارة</p>
                     <p class="font-bold">المملكة العربية السعودية، الرياض</p>
                     <p class="font-bold">المعيقلية، الديرة، SA</p>
-                    <p class="text-blue-600 font-bold">hwytbytk@gmail.com</p>
+                    
                     <p dir="ltr" class="font-black">0500708832</p>
                 </div>
             </div>
@@ -220,11 +220,9 @@
                                         <p class="font-bold text-gray-700 flex justify-between">
                                             <span>• سعر المنشر الأساسي:</span> <span class="font-black">{{ p.basePrice }} SAR</span>
                                         </p>
-                                        <p v-if="p.color === 'gold' || p.color === 'black'" class="font-bold text-gray-700 flex justify-between">
-                                            <span>• اللون ({{ p.color === 'gold' ? 'ذهبي' : 'أسود' }}):</span> <span class="font-black">+19 SAR</span>
-                                        </p>
-                                        <p v-else class="font-bold text-gray-500 flex justify-between">
-                                            <span>• اللون (فضي):</span> <span class="font-black">مجاناً</span>
+                                        <p class="font-bold text-gray-700 flex justify-between" :class="{'text-gray-500': p.color === 'white' || p.color === 'أبيض' || p.color === 'silver' || p.color === 'فضي'}">
+                                            <span>• اللون ({{ p.color === 'white' || p.color === 'أبيض' ? 'أبيض' : (p.color === 'black' || p.color === 'أسود' ? 'أسود' : (p.color === 'gold' || p.color === 'ذهبي' ? 'ذهبي' : (p.color === 'silver' || p.color === 'فضي' ? 'فضي' : p.color))) }}):</span> 
+                                            <span class="font-black">{{ (p.color === 'gold' || p.color === 'black' || p.color === 'أسود' || p.color === 'ذهبي') ? '+19 SAR' : 'مجاناً' }}</span>
                                         </p>
                                         <p v-if="p.hasLighting" class="font-bold text-gray-700 flex justify-between">
                                             <span>• إضافة إضاءة:</span> <span class="font-black">+129 SAR</span>
@@ -291,7 +289,7 @@
                 <p class="font-black text-[#3a2016] text-sm mb-1">شكراً لتسوقكم معنا في منشر</p>
                 <p class="text-[10px] text-gray-500 mb-1">البضاعة المباعة لا ترد ولا تستبدل إلا في حالة وجود عيب مصنعي خلال 3 أيام من تاريخ الاستلام.</p>
                 <p class="text-[10px] font-bold text-gray-600">
-                    للتواصل والدعم الفني: <span dir="ltr" class="text-blue-700">hwytbytk@gmail.com</span> | <span dir="ltr" class="text-[#3a2016]">0500708832</span>
+                    للتواصل والدعم الفني: <span dir="ltr" class="text-[#3a2016]">0500708832</span>
                 </p>
             </div>
         </div>
@@ -442,7 +440,7 @@
                         let additions = 0;
                         if (p.hasLighting) additions += 129;
                         if (p.customDesign) additions += 50;
-                        if (p.color === 'gold' || p.color === 'black') additions += 19;
+                        if (p.color === 'gold' || p.color === 'black' || p.color === 'أسود' || p.color === 'ذهبي') additions += 19;
                         p.basePrice = p.price - additions;
 
                         grouped[oid].products.push(p);
@@ -516,5 +514,8 @@
 </script>
 </body>
 </html>
+
+
+
 
 
