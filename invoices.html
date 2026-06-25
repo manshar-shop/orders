@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>منشر - مركز الفواتير</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="invoice_component.js"></script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Tajawal', sans-serif; background-color: #f8fafc; color: #1e293b; }
+        .sidebar { background: #3a2016; }
+        .active-tab { background: rgba(255,255,255,0.1); border-right: 4px solid #fbbf24; }
+        .loader-spin { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        
+        .invoice-a4 { width: 210mm; height: 296mm; max-height: 296mm; background: white; margin: 0 auto; padding: 8mm 12mm 25mm 12mm; box-sizing: border-box; color: #000; line-height: 1.3; position: relative; overflow: hidden; }
+        .inv-info-box { background: #f9fafb; padding: 10px; border-radius: 8px; border: 1px solid #f1f5f9; }
+        .inv-table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        .inv-table th { background: #3a2016; color: white; padding: 6px 8px; text-align: right; font-size: 12px; border: 1px solid #3a2016; }
+        .inv-table td { border: 1px solid #e2e8f0; padding: 6px 8px; vertical-align: top; font-size: 11px; }
+        .invoice-footer { position: absolute; bottom: 8mm; left: 12mm; right: 12mm; border-top: 2px solid #3a2016; padding-top: 8px; text-align: center; }
+
+        #capture-area { position: absolute; left: -9999px; top: 0; width: 210mm; }
+        
+        @media print {
+            @page { size: A4; margin: 0; }
+            .no-print { display: none !important; }
+            body { background: white; margin: 0; padding: 0; }
+            .invoice-a4 { width: 210mm; height: 297mm; margin: 0; padding: 8mm 12mm 25mm 12mm; border: none; page-break-after: always; position: relative; overflow: hidden; }
+            #capture-area { position: relative !important; left: 0 !important; top: 0 !important; width: 100% !important; }
+        }
+    </style>
+</head>
+<body>
+<div id="app" class="min-h-screen flex">
+
+    <aside class="sidebar w-64 text-white flex flex-col no-print fixed h-full z-50 shadow-2xl">
+        <div class="p-8 text-center border-b border-white/5">
+            <div class="w-24 h-24 bg-white rounded-3xl mx-auto mb-4 flex items-center justify-center p-2 shadow-xl overflow-hidden">
+                <img src="logo1.png" alt="Logo" class="w-full h-full object-contain" onerror="this.src='https://i.ibb.co/68vD84D/logo1.png'">
+            </div>
+            <h1 class="text-xl font-black">منشر</h1>
+            <p class="text-blue-300 text-[10px] mt-1 tracking-widest font-bold uppercase">نظام إدارة المبيعات</p>
+            <div class="mt-3 flex items-center justify-center gap-2">
+                <span class="text-[10px] font-black px-3 py-1 rounded-full" :class="currentUser?.role === 'admin' ? 'bg-yellow-400 text-yellow-900' : 'bg-blue-700 text-blue-100'">
+                    {{ currentUser?.role === 'admin' ? '👑 مدير' : '👤 ' + currentUser?.managerCode }}
+                </span>
+            </div>
+        </div>
+        <nav class="flex-1 py-10 px-4 space-y-2">
+            <a href="index.html" class="w-full flex items-center gap-4 px-6 py-4 rounded-xl transition-all font-bold hover:bg-white/5">
+                <i data-lucide="plus-circle" class="w-5 h-5 text-yellow-400"></i> تسجيل طلب
+            </a>
+            <a href="my_orders.html" class="w-full flex items-center gap-4 px-6 py-4 rounded-xl transition-all font-bold hover:bg-white/5">
+                <i data-lucide="list" class="w-5 h-5 text-yellow-400"></i> طلباتي
+            </a>
+            <a href="invoices.html" class="active-tab w-full flex items-center gap-4 px-6 py-4 rounded-xl transition-all font-bold hover:bg-white/5">
+                <i data-lucide="printer" class="w-5 h-5 text-yellow-400"></i> مركز الفواتير
+            </a>
+            <a href="archive.html" class="w-full flex items-center gap-4 px-6 py-4 rounded-xl transition-all font-bold hover:bg-white/5">
+                <i data-lucide="database" class="w-5 h-5 text-yellow-400"></i> أرشيف الطلبات العام
+            </a>
+            <a href="catalog.html" class="w-full flex items-center gap-4 px-6 py-4 rounded-xl transition-all font-bold hover:bg-white/5">
+                <i data-lucide="package" class="w-5 h-5 text-yellow-400"></i> المنتجات
+            </a>
+            <a v-if="currentUser?.role === 'admin'" href="reports.html" class="w-full flex items-center gap-4 px-6 py-4 rounded-xl transition-all font-bold hover:bg-white/5">
+                <i data-lucide="pie-chart" class="w-5 h-5 text-yellow-400"></i> التقارير والإحصائيات
+            </a>
+        </nav>
+        <div class="p-4 border-t border-white/10">
+            <button @click="doLogout" class="w-full flex items-center gap-3 px-6 py-3 rounded-xl hover:bg-white/10 transition-all font-bold text-red-300 hover:text-red-200">
+                <i data-lucide="log-out" class="w-4 h-4"></i> تسجيل خروج
+            </button>
+        </div>
+    </aside>
+
+    <main class="flex-1 mr-64 p-8 no-print relative min-h-screen">
+        <div v-if="notification" class="fixed top-10 left-10 z-[100] p-5 rounded-2xl shadow-2xl bg-white border-l-8 flex items-center gap-4 transition-all"
+             :class="{'border-red-500 text-red-600 animate-bounce': notification.type === 'error', 'border-green-500 text-green-600 animate-bounce': notification.type === 'success', 'border-blue-500 text-blue-700': notification.type === 'info'}">
+            <i v-if="notification.type === 'success'" data-lucide="check-circle"></i>
+            <i v-else-if="notification.type === 'error'" data-lucide="alert-circle"></i>
+            <i v-else data-lucide="loader" class="animate-spin"></i>
+            <span class="font-black">{{ notification.msg }}</span>
+        </div>
+
+        <div v-if="syncLoading" class="fixed inset-0 bg-white/70 z-40 flex flex-col items-center justify-center backdrop-blur-sm">
+            <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-[#3a2016] mb-4"></div>
+            <p class="font-black text-[#3a2016]">جاري معالجة ومزامنة البيانات...</p>
+        </div>
+
+        <header class="mb-10 flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            <div>
+                <h2 class="text-3xl font-black text-[#3a2016]">مركز الفواتير</h2>
+            </div>
+            <div class="flex gap-2">
+                <button @click="syncFromSheet" class="bg-[#3a2016] text-white px-6 py-3 rounded-2xl font-black flex items-center gap-2 shadow-lg hover:bg-blue-800 transition-all">
+                    <i data-lucide="refresh-cw" :class="{'loader-spin': syncLoading}" class="w-4 h-4"></i>
+                    تحديث الفواتير
+                </button>
+            </div>
+        </header>
+
+        <section class="space-y-8 animate-in fade-in">
+            <div class="bg-white p-8 rounded-3xl shadow-sm border flex flex-col xl:flex-row justify-between items-center gap-6">
+                <div class="flex flex-wrap items-center gap-6">
+                    <div class="flex items-center gap-3">
+                        <label class="font-black text-[#3a2016] text-lg">تاريخ الطلب:</label>
+                        <input type="date" v-model="filterDate" class="border-2 border-blue-50 p-3 rounded-2xl outline-none focus:ring-4 focus:ring-blue-100 bg-gray-50 font-bold shadow-inner">
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <label class="font-black text-[#3a2016] text-lg">حالة الدفع:</label>
+                        <select v-model="filterPaymentStatus" class="border-2 border-blue-50 p-3 rounded-2xl outline-none focus:ring-4 focus:ring-blue-100 bg-gray-50 font-bold shadow-inner">
+                            <option value="all">الكل</option>
+                            <option value="paid">مدفوع</option>
+                            <option value="unpaid">غير مدفوع</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-3">
+                    <button @click="printBulk" class="bg-[#3a2016] text-white px-8 py-4 rounded-2xl font-black flex items-center gap-2 shadow-xl hover:bg-blue-800 transition-all">
+                        <i data-lucide="printer" class="w-5 h-5 text-yellow-400"></i> طباعة مجمعة
+                    </button>
+                    <button @click="downloadBulkPDF" class="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black flex items-center gap-2 shadow-xl hover:bg-blue-700 transition-all">
+                        <i data-lucide="file-down" class="w-5 h-5 text-white"></i> تحميل PDF مجمع
+                    </button>
+                </div>
+            </div>
+
+            <div v-if="filteredByDateOrders.length === 0" class="py-32 text-center bg-white rounded-3xl border-4 border-dashed border-gray-100 shadow-none">
+                <i data-lucide="inbox" class="w-20 h-20 text-gray-200 mx-auto mb-6"></i>
+                <p class="text-gray-400 font-black text-xl">لا توجد فواتير مطابقة لخياراتك في هذا اليوم</p>
+            </div>
+
+            <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div v-for="order in filteredByDateOrders" :key="order.orderId" class="bg-white p-8 rounded-3xl border-2 border-transparent hover:border-blue-500 shadow-sm transition-all cursor-pointer relative group" @click="viewInvoice(order)">
+                    <div class="absolute inset-0 bg-blue-500/5 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span class="bg-blue-600 text-white px-6 py-2 rounded-xl font-black shadow-lg">معاينة وطباعة الفاتورة</span>
+                    </div>
+                    <div class="flex justify-between items-start mb-6">
+                        <span class="bg-blue-50 text-blue-700 px-4 py-1.5 rounded-full text-xs font-black tracking-widest uppercase">{{ order.orderId }}</span>
+                        <span class="text-[10px] font-bold text-gray-400">{{ formatTime(order.timestamp) }}</span>
+                    </div>
+                    <h4 class="font-black text-[#3a2016] text-xl mb-1 truncate">{{ order.client?.name || 'بدون اسم' }}</h4>
+                    <p class="text-xs text-gray-400 line-clamp-1 mb-6">📍 {{ order.client?.address || 'غير محدد' }}</p>
+                    <div class="flex justify-between items-center border-t border-dashed border-gray-100 pt-6">
+                        <span class="font-black text-green-600 text-lg">{{ order.totalAmount }} SAR</span>
+                        <div class="flex items-center gap-2">
+                            <span v-if="order.receipts && order.receipts.length > 0" class="bg-blue-100 text-blue-600 text-[10px] px-2 py-0.5 rounded font-black flex items-center gap-1"><i data-lucide="image" class="w-3 h-3"></i> {{ order.receipts.length }}</span>
+                            <span v-if="order.isPaid" class="text-green-500 font-black text-xs flex items-center gap-1"><i data-lucide="check-circle" class="w-3 h-3"></i> مدفوع</span>
+                            <span v-else class="text-red-400 font-black text-xs flex items-center gap-1"><i data-lucide="x-circle" class="w-3 h-3"></i> غير مدفوع</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div id="capture-area" dir="rtl">
+        <invoice-widget v-for="invoice in bulkList" :key="invoice.orderId" :id="'inv-' + invoice.orderId" :invoice="invoice"></invoice-widget>
+    </div>
+</div>
+
+<script type="module">
+    const { createApp, ref, computed, onMounted, nextTick } = Vue;
+    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzei9Oh1gJ-TTEHqcnoovWvKhpBdA3EYzrgKBmSnSShErby_RRHSyFMEhh4QIcSdX0L/exec";
+
+    function parseSheetDate(dateStr) {
+        if (!dateStr) return new Date().toISOString();
+        let d = new Date(dateStr);
+        if (!isNaN(d.getTime())) return d.toISOString();
+        if (typeof dateStr === 'string') {
+            const s = dateStr.trim();
+            const parts = s.split(/[\/\-]/);
+            if (parts.length === 3 && parts[2].length === 4) {
+                d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+                if (!isNaN(d.getTime())) return d.toISOString();
+            }
+        }
+        return new Date().toISOString();
+    }
+
+    const getPaymentStatus = (statusStr, codStr) => {
+        const s = String(statusStr || '').trim();
+        const c = String(codStr || '').trim();
+        if (s === 'تم الدفع' || (s.includes('تم الدفع') && !s.includes('لم'))) return 'تم الدفع';
+        if (s === 'الدفع عند الاستلام' || s.includes('استلام') || c === 'نعم' || c === 'true') return 'الدفع عند الاستلام';
+        return 'لم يتم الدفع';
+    };
+
+    createApp({
+        components: {
+            'invoice-widget': window.InvoiceWidget
+        },
+        setup() {
+            const currentUser = ref(null);
+            const orders = ref([]);
+            const bulkList = ref([]);
+            
+            const filterDate = ref(new Date().toISOString().split('T')[0]);
+            const filterPaymentStatus = ref('all');
+            
+            const syncLoading = ref(false);
+            const notification = ref(null);
+
+            const filteredByDateOrders = computed(() => {
+                return orders.value.filter(o => {
+                    if (currentUser.value?.role !== 'admin') {
+                        if (String(o.managerCode || '').toUpperCase() !== String(currentUser.value?.managerCode || '').toUpperCase()) return false;
+                    }
+                    const dateMatch = (o.timestamp || '').split('T')[0] === filterDate.value;
+                    let statusMatch = true;
+                    if (filterPaymentStatus.value === 'paid')   statusMatch = o.isPaid === true;
+                    if (filterPaymentStatus.value === 'unpaid') statusMatch = o.isPaid !== true;
+                    return dateMatch && statusMatch;
+                });
+            });
+
+            const showNotify = (msg, type = 'success') => {
+                notification.value = { msg, type };
+                setTimeout(() => notification.value = null, 4000);
+                setTimeout(() => lucide.createIcons(), 50);
+            };
+
+            const doLogout = () => { sessionStorage.removeItem('hb_user'); window.location.href = 'index.html'; };
+
+            const viewInvoice = (order) => {
+                bulkList.value = [order];
+                nextTick(() => { setTimeout(() => window.print(), 500); });
+            };
+
+            const printBulk = () => { 
+                if (!filteredByDateOrders.value.length) return showNotify('لا يوجد فواتير مطابقة لخياراتك', 'error'); 
+                bulkList.value = filteredByDateOrders.value; 
+                nextTick(() => setTimeout(() => window.print(), 800)); 
+            };
+            
+            const downloadBulkPDF = async () => {
+                if (!filteredByDateOrders.value.length) return showNotify('لا يوجد فواتير لتحميلها', 'error');
+                syncLoading.value = true; 
+                showNotify('جاري بناء الملف المجمع (يرجى الانتظار)...', 'info');
+                
+                const { jsPDF } = window.jspdf; 
+                const finalPDF = new jsPDF('p', 'mm', 'a4');
+                
+                for (let i = 0; i < filteredByDateOrders.value.length; i++) {
+                    bulkList.value = [filteredByDateOrders.value[i]]; 
+                    await nextTick(); 
+                    await new Promise(r => setTimeout(r, 400)); 
+                    
+                    const canvas = await html2canvas(document.getElementById('inv-' + filteredByDateOrders.value[i].orderId), { scale: 2 });
+                    if (i > 0) finalPDF.addPage();
+                    finalPDF.addImage(canvas.toDataURL('image/jpeg', 0.8), 'JPEG', 0, 0, 210, 297);
+                }
+                
+                finalPDF.save(`فواتير_${filterDate.value}.pdf`); 
+                syncLoading.value = false;
+                showNotify('تم تحميل الملف بنجاح');
+            };
+
+            const syncFromSheet = async () => {
+                syncLoading.value = true;
+                try {
+                    const res = await fetch(GOOGLE_SCRIPT_URL, { redirect: 'follow' });
+                    const text = await res.text();
+                    let result = JSON.parse(text);
+
+                    const grouped = {};
+                    (result.orders || []).forEach(row => {
+                        const oid = String(row['رقم الطلب'] || '').trim();
+                        if (!oid) return;
+                        
+                        if (!grouped[oid]) {
+                            let rawReceipt = String(row['صورة الإيصال'] || '');
+                            let loadedReceipts = [];
+                            if (rawReceipt.includes('|||')) {
+                                loadedReceipts = rawReceipt.split('|||').filter(x => x.trim().length > 0);
+                            } else if (rawReceipt.trim().length > 0) {
+                                loadedReceipts = [rawReceipt.trim()];
+                            }
+
+                            grouped[oid] = {
+                                orderId: oid, 
+                                managerCode: String(row['رمز المسؤول'] || oid.split('-')[0] || 'XX').trim(),
+                                discountRate: Number(row['نسبة الخصم'] || 0), 
+                                discountValue: Number(row['قيمة الخصم'] || 0),
+                                paymentStatus: getPaymentStatus(row['حالة الدفع'], row['الدفع عند الاستلام']),
+                                isPaid: getPaymentStatus(row['حالة الدفع'], row['الدفع عند الاستلام']) === 'تم الدفع',
+                                payOnDelivery: row['الدفع عند الاستلام'] === 'نعم' || row['الدفع عند الاستلام'] === true,
+                                receipts: loadedReceipts,
+                                client: { name: String(row['العميل'] || ''), city: String(row['المدينة'] || ''), phone: String(row['الجوال'] || ''), address: String(row['العنوان بالتفصيل'] || '') },
+                                products: [], totalAmount: 0, subTotal: 0,
+                                timestamp: parseSheetDate(row['التاريخ'])
+                            };
+                        }
+                        
+                        const productNameOrId = String(row['المنتج'] || '').trim();
+                        const p = {
+                            id: Date.now() + Math.random(),
+                            productId: productNameOrId,
+                            name: productNameOrId, 
+                            color: String(row['اللون'] || 'silver'),
+                            count: Number(row['العدد'] || 1), 
+                            price: Number(row['السعر الفردي'] || 0),
+                            nationalAddress: String(row['العنوان الوطني'] || ''), 
+                            villaNo: String(row['رقم الفيلا'] || ''),
+                            customName: String(row['الاسم المخصص'] || ''), 
+                            notes: String(row['ملاحظات'] || ''),
+                            hasLighting: row['إضافة إضاءة'] === 'نعم' || row['إضافة إضاءة'] === true,
+                            customDesign: row['تصميم خاص'] === 'نعم' || row['تصميم خاص'] === true
+                        };
+                        
+                        let additions = 0;
+                        if (p.hasLighting) additions += 129;
+                        if (p.customDesign) additions += 50;
+                        p.basePrice = p.price - additions;
+
+                        grouped[oid].products.push(p);
+                    });
+
+                    Object.values(grouped).forEach(o => {
+                        let discountable = 0;
+                        let nonDiscountable = 0;
+                        
+                        o.products.forEach(p => {
+                            let adds = 0;
+                            if (p.hasLighting) adds += 129;
+                            if (p.customDesign) adds += 50;
+                            let baseAndColor = p.price - adds;
+                            discountable += (baseAndColor * p.count);
+                            nonDiscountable += (adds * p.count);
+                        });
+                        
+                        o.subTotal = discountable + nonDiscountable;
+                        if (o.discountRate > 0) {
+                            o.discountValue = Number(((discountable * o.discountRate) / 100).toFixed(2));
+                            o.totalAmount = Math.round(discountable - o.discountValue + nonDiscountable);
+                        } else {
+                            o.totalAmount = o.subTotal;
+                        }
+                    });
+
+                    orders.value = Object.values(grouped).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+                    
+                    // ✅ احذف localStorage إذا كان موجود عشان امتلأ
+                    try {
+                        localStorage.removeItem('hwayt_orders_v8');
+                    } catch(e) {}
+                    
+                    showNotify('تم تحديث الفواتير من السحاب بنجاح');
+                } catch(e) {
+                    console.error('خطأ:', e);
+                    showNotify('خطأ في المزامنة: ' + e.message, 'error');
+                } finally { syncLoading.value = false; }
+            };
+
+            const formatDate = (ts) => ts ? new Date(ts).toLocaleDateString('ar-SA') : '-';
+            const formatDateLong = (ts) => ts ? new Date(ts).toLocaleDateString('en-GB', { weekday:'long', year:'numeric', month:'long', day:'numeric' }) : '-';
+            const formatTime = (ts) => ts ? new Date(ts).toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' }) : '-';
+
+            onMounted(() => { 
+                const storedUser = sessionStorage.getItem('hb_user');
+                if (!storedUser) { window.location.href = 'index.html'; return; }
+                currentUser.value = JSON.parse(storedUser);
+                
+                // حاول تحميل من localStorage بدون أن تفشل إذا امتلأ
+                try {
+                    const localOrders = localStorage.getItem('hwayt_orders_v8');
+                    if (localOrders) orders.value = JSON.parse(localOrders);
+                } catch (e) {
+                    console.warn('لم يتم تحميل البيانات المحلية');
+                }
+
+                setTimeout(() => lucide.createIcons(), 500); 
+                syncFromSheet();
+            });
+
+            return {
+                currentUser, orders, bulkList, syncLoading, notification, 
+                filterDate, filterPaymentStatus, filteredByDateOrders,
+                doLogout, viewInvoice, printBulk, downloadBulkPDF, syncFromSheet,
+                formatDate, formatDateLong, formatTime
+            };
+        }
+    }).mount('#app');
+</script>
+</body>
+</html>
+
+
+
+
+
