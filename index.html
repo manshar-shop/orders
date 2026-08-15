@@ -305,9 +305,11 @@
         1: 299
     };
 
+    const isAfter16Aug2026 = new Date() >= new Date('2026-08-16T00:00:00');
+
     const DEFAULT_CATALOG = [
-        { id: 'design-1', name: 'design-1', price: 299 },
-        { id: 'design-2', name: 'design-2', price: 249 }
+        { id: 'design-1', name: 'design-1', price: isAfter16Aug2026 ? 296 : 299 },
+        { id: 'design-2', name: 'design-2', price: isAfter16Aug2026 ? 296 : 249 }
     ];
 
     const EMPTY_ORDER_FORM = () => ({
@@ -492,6 +494,11 @@
                             let id = String(r['id'] || r['اسم المنتج'] || '');
                             let name = String(r['name'] || r['اسم المنتج'] || '');
                             let price = parseFloat(r['price'] || r['السعر'] || 0);
+                            
+                            if (isAfter16Aug2026) {
+                                price = 296;
+                            }
+                            
                             if (id && !newCat.some(c => c.id === id)) newCat.push({ id, name, price });
                         });
                     }
